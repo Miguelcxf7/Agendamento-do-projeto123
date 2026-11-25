@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Agendamento de Aulas Clube Goiabeiras </title>
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+    <div class="app">
+
+        <div class="header">
+
+            <h1>Agendamento</h1>
+
+            <p>
+                Escolha o mês, selecione um dia e confira os horários disponíveis.
+            </p>
+
+        </div>
+
+
+        <div class="layout">
+
+            
+
+            <section class="panel">
+
+                <div class="month-row">
+
+                    <button id="prevMonth">
+                        ‹
+                    </button>
+
+                    <div class="month-title" id="monthTitle">
+                    </div>
+
+                    <button id="nextMonth">
+                        ›
+                    </button>
+
+                </div>
+
+
+                <div class="weekdays">
+
+                    <div class="weekday">DOM</div>
+                    <div class="weekday">SEG</div>
+                    <div class="weekday">TER</div>
+                    <div class="weekday">QUA</div>
+                    <div class="weekday">QUI</div>
+                    <div class="weekday">SEX</div>
+                    <div class="weekday">SÁB</div>
+
+                </div>
+
+
+                <div class="calendar" id="calendar">
+                </div>
+
+
+                <div class="legend">
+
+                    <span>
+                        <i class="green"></i>
+                        Possui disponibilidade
+                    </span>
+
+                    <span>
+                        <i class="gray"></i>
+                        Sem disponibilidade
+                    </span>
+
+                </div>
+
+            </section>
+
+
+            <!-- HORÁRIOS -->
+
+            <aside class="panel side">
+
+                <h2>
+                    Horários do dia
+                </h2>
+
+                <div class="selected-date" id="selectedDate">
+                    Selecione uma data no calendário.
+                </div>
+
+
+                <div class="cards" id="cards">
+                </div>
+
+            </aside>
+
+        </div>
+
+    </div>
+
+
+    <!-- MODAL DE CONFIRMAÇÃO -->
+
+    <div class="modal" id="modal">
+
+        <div class="modal-box">
+
+            <h3>
+                Confirmar agendamento
+            </h3>
+
+            <p id="modalText"></p>
+
+            <div class="modal-actions">
+
+                <button id="cancelBtn">
+                    Cancelar
+                </button>
+
+                <button class="confirm" id="confirmBtn">
+                    Confirmar
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <script>
+
+        /* =====================================================
+           MESES
+        ===================================================== */
+
+        const monthNames = [
+
+            "janeiro",
+            "fevereiro",
+            "março",
+            "abril",
+            "maio",
+            "junho",
+            "julho",
+            "agosto",
+            "setembro",
+            "outubro",
+            "novembro",
+            "dezembro"
+
+        ];
+
+
+        /* =====================================================
+           DADOS DOS HORÁRIOS
+           
+           FUTURAMENTE:
+           Esses dados podem vir do banco de dados.
+        ===================================================== */
+
+        const schedule = {
+
+            "2026-10-08": [
+
+                {
+                    time: "14:10h-15h",
+                    status: "DISPONÍVEL",
+                    type: "",
+                    description: ""
+                },
+
+                {
+                    time: "15:10h-16h",
+                    status: "OCUPADO",
+                    type: "Turma Intermediário",
+                    description: "Prof Débora."
+                },
+
+                {
+                    time: "16:10h-17h",
+                    status: "OCUPADO",
+                    type: "RESERVA",
+                    description: ""
+                },
+
+                {
+                    time: "17:10h-18h",
+                    status: "OCUPADO",
+                    type: "Turma Avançado",
+                    description: "Prof Ericke"
+                },
+
+                {
+                    time: "18:10h-19h",
+                    status: "OCUPADO",
+                    type: "INDIVIDUAL",
+                    description: ""
+                },
+
+                {
+                    time: "19:10h-20h",
+                    status: "INDISPONÍVEL",
+                    type: "",
+                    description: ""
+                }
+
+            ],
+
+
+            "2026-10-09": [
+
+                {
+                    time: "14:10h-15h",
+                    status: "OCUPADO",
+                    type: "Turma Iniciante",
+                    description: "Prof Ana."
+                },
+
+                {
+                    time: "15:10h-16h",
+                    status: "DISPONÍVEL",
+                    type: "INDIVIDUAL",
+                    description: ""
+                },
+
+                {
+                    time: "16:10h-17h",
+                    status: "DISPONÍVEL",
+                    type: "INDIVIDUAL",
+                    description: ""
+                }
+
+            ],
+
+
+            "2026-10-15": [
+
+                {
+                    time: "14:10h-15h",
+                    status: "DISPONÍVEL",
+                    type: "Turma",
+                    description: ""
+                },
+
+                {
+                    time: "17:10h-18h",
+                    status: "RESERVADO",
+                    type: "INDIVIDUAL",
+                    description: ""
+                }
+
+            ]
+
+        };
+
+
+        /* =====================================================
+           VARIÁVEIS
+        ===================================================== */
+
+        let current = new Date(2026, 9, 1);
+
+        let selectedKey = "2026-10-08";
+
+        let pendingSlot = null;
+
+
+        const calendarEl =
+            document.getElementById("calendar");
+
+        const monthTitleEl =
+            document.getElementById("monthTitle");
+
+        const selectedDateEl =
+            document.getElementById("selectedDate");
+
+        const cardsEl =
+            document.getElementById("cards");
+
+        const modal =
+            document.getElementById("modal");
+
+        const modalText =
+            document.getElementById("modalText");
+
+
+        /* =====================================================
+           CRIA A CHAVE DA DATA
+           
+           Exemplo:
+           2026-10-08
+        ===================================================== */
+
+        function keyFor(year, month, day) {
+
+            return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+        }
+
+
+        /* =====================================================
+           DESENHA O CALENDÁRIO
+        ===================================================== */
+
+        function renderCalendar() {
+
+            const year =
+                current.getFullYear();
+
+            const month =
+                current.getMonth();
+
+
+            monthTitleEl.textContent =
+                `${monthNames[month]} ${year}`;
+
+
+            calendarEl.innerHTML = "";
+
+
+            const firstDay =
+                new Date(year, month, 1).getDay();
+
+
+            const daysInMonth =
+                new Date(year, month + 1, 0).getDate();
+
+
+            /* Espaços antes do primeiro dia */
+
+            for (
+                let i = 0;
+                i < firstDay;
+                i++
+            ) {
+
+                const empty =
+                    document.createElement("div");
+
+                empty.className =
+                    "day empty";
+
+                calendarEl.appendChild(empty);
+
+            }
+
+
+            /* Dias */
+
+            for (
+                let day = 1;
+                day <= daysInMonth;
+                day++
+            ) {
+
+                const key =
+                    keyFor(
+                        year,
+                        month,
+                        day
+                    );
+
+
+                const button =
+                    document.createElement("button");
+
+
+                button.className =
+                    "day";
+
+
+                button.textContent =
+                    day;
+
+
+                /* Dia selecionado */
+
+                if (
+                    key === selectedKey
+                ) {
+
+                    button.classList.add(
+                        "selected"
+                    );
+
+                }
+
+
+                /* Verifica se existe
+                   horário disponível */
+
+                const slots =
+                    schedule[key] || [];
+
+
+                const hasAvailable =
+                    slots.some(
+                        slot =>
+                            slot.status === "DISPONÍVEL"
+                    );
+
+
+                if (hasAvailable) {
+
+                    const dot =
+                        document.createElement("span");
+
+                    dot.className =
+                        "dot";
+
+                    button.appendChild(dot);
+
+                }
+
+
+                /* Clique no dia */
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        selectedKey =
+                            key;
+
+                        renderCalendar();
+
+                        renderCards();
+
+                    }
+                );
+
+
+                calendarEl.appendChild(
+                    button
+                );
+
+            }
+
+        }
+
+
+        /* =====================================================
+           FORMATA A DATA
+        ===================================================== */
+
+        function formatDate(key) {
+
+            const [
+                y,
+                m,
+                d
+            ] =
+                key
+                    .split("-")
+                    .map(Number);
+
+
+            return new Date(
+                y,
+                m - 1,
+                d
+            ).toLocaleDateString(
+                "pt-BR",
+                {
+                    weekday: "long",
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric"
+                }
+            );
+
+        }
+
+
+        /* =====================================================
+           MOSTRA OS CARDS DO DIA
+        ===================================================== */
+
+        function renderCards() {
+
+            cardsEl.innerHTML = "";
+
+
+            if (!selectedKey) {
+
+                selectedDateEl.textContent =
+                    "Selecione uma data no calendário.";
+
+                return;
+
+            }
+
+
+            selectedDateEl.textContent =
+                formatDate(selectedKey);
+
+
+            const slots =
+                schedule[selectedKey] || [];
+
+
+            /* Nenhum horário */
+
+            if (!slots.length) {
+
+                cardsEl.innerHTML = `
+
+                <div class="empty-message">
+
+                    Nenhum horário
+                    cadastrado para este dia.
+
+                </div>
+
+            `;
+
+                return;
+
+            }
+
+
+            /* Cria cada card */
+
+            slots.forEach(
+                (slot, index) => {
+
+                    const card =
+                        document.createElement("div");
+
+
+                    let statusClass;
+
+
+                    if (
+                        slot.status ===
+                        "DISPONÍVEL"
+                    ) {
+
+                        statusClass =
+                            "available";
+
+                    }
+
+                    else if (
+                        slot.status ===
+                        "OCUPADO"
+                    ) {
+
+                        statusClass =
+                            "occupied";
+
+                    }
+
+                    else if (
+                        slot.status ===
+                        "RESERVADO" ||
+                        slot.status ===
+                        "RESERVADA"
+                    ) {
+
+                        statusClass =
+                            "reserved";
+
+                    }
+
+                    else {
+
+                        statusClass =
+                            "unavailable";
+
+                    }
+
+
+                    card.className =
+                        `slot ${statusClass}`;
+
+
+                    card.innerHTML = `
+
+                    <div class="slot-top">
+
+                        <span class="time">
+
+                            ${slot.time}
+
+                        </span>
+
+                        <span class="status">
+
+                            ${slot.status}
+
+                        </span>
+
+                    </div>
+
+
+                    <div class="type">
+
+                        <strong>
+                            Tipo de aula:
+                        </strong>
+
+                        ${slot.type || "Não informado"}
+
+                    </div>
+
+
+                    <div class="description">
+
+                        <strong>
+                            Descrição:
+                        </strong>
+
+                        ${slot.description || "Sem descrição."}
+
+                    </div>
+
+
+                    <button
+                        class="book-btn"
+                        ${slot.status !== "DISPONÍVEL"
+                            ? "disabled"
+                            : ""}>
+
+                        ${slot.status ===
+                            "DISPONÍVEL"
+
+                            ? "Agendar horário"
+
+                            : "Indisponível para agendamento"
+                        }
+
+                    </button>
+
+                `;
+
+
+                    const btn =
+                        card.querySelector(
+                            ".book-btn"
+                        );
+
+
+                    /* Só permite
+                       agendamento se
+                       estiver disponível */
+
+                    if (
+                        slot.status ===
+                        "DISPONÍVEL"
+                    ) {
+
+                        btn.addEventListener(
+                            "click",
+                            () => {
+
+                                openModal(
+                                    slot,
+                                    index
+                                );
+
+                            }
+                        );
+
+                    }
+
+
+                    cardsEl.appendChild(
+                        card
+                    );
+
+                }
+            );
+
+        }
+
+
+        /* =====================================================
+           ABRIR CONFIRMAÇÃO
+        ===================================================== */
+
+        function openModal(
+            slot,
+            index
+        ) {
+
+            pendingSlot = {
+                ...slot,
+                index
+            };
+
+
+            modalText.textContent =
+                `Você deseja agendar o horário ${slot.time} do dia ${formatDate(selectedKey)}?`;
+
+
+            modal.classList.add(
+                "open"
+            );
+
+        }
+
+
+        /* =====================================================
+           CANCELAR
+        ===================================================== */
+
+        document
+            .getElementById("cancelBtn")
+            .onclick = () => {
+
+                modal.classList.remove(
+                    "open"
+                );
+
+                pendingSlot = null;
+
+            };
+
+
+        /* =====================================================
+           CONFIRMAR AGENDAMENTO
+        ===================================================== */
+
+        document
+            .getElementById("confirmBtn")
+            .onclick = () => {
+
+                if (!pendingSlot)
+                    return;
+
+
+                /*
+                    Aqui estamos apenas
+                    simulando o agendamento.
+    
+                    No sistema real:
+                    aqui será feita uma
+                    requisição para o backend.
+                */
+
+                schedule[selectedKey]
+                [pendingSlot.index]
+                    .status = "RESERVADO";
+
+
+                modal.classList.remove(
+                    "open"
+                );
+
+
+                pendingSlot = null;
+
+
+                renderCards();
+
+                renderCalendar();
+
+
+                alert(
+                    "Agendamento realizado com sucesso!"
+                );
+
+            };
+
+
+        /* =====================================================
+           MÊS ANTERIOR
+        ===================================================== */
+
+        document
+            .getElementById("prevMonth")
+            .onclick = () => {
+
+                current.setMonth(
+                    current.getMonth() - 1
+                );
+
+                renderCalendar();
+
+            };
+
+
+        /* =====================================================
+           PRÓXIMO MÊS
+        ===================================================== */
+
+        document
+            .getElementById("nextMonth")
+            .onclick = () => {
+
+                current.setMonth(
+                    current.getMonth() + 1
+                );
+
+                renderCalendar();
+
+            };
+
+
+        /* =====================================================
+           INICIALIZAÇÃO
+        ===================================================== */
+
+        renderCalendar();
+
+        renderCards();
+
+    </script>
+
+</body>
+
+</html>
